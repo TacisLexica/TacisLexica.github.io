@@ -210,12 +210,12 @@
 		ctxGrid.fillStyle = colours[cellTypes.VOID];
 		ctxGrid.fillRect(0, 0, cvsGrid.width, cvsGrid.height);
 		
-		renderGameMap(gameBorderWidth, gameBorderWidth, viewWidth, viewHeight, playerX - Math.floor(viewWidth/2), playerY - Math.floor(viewHeight/2));
+		drawGameMap(gameBorderWidth, gameBorderWidth, viewWidth, viewHeight, playerX - Math.floor(viewWidth/2), playerY - Math.floor(viewHeight/2));
 		
 		ctxGrid.fillStyle = colours[cellTypes.PLAYER];
 		ctxGrid.fillRect(gameBorderWidth + Math.floor(viewWidth/2), gameBorderWidth + Math.floor(viewHeight/2), 1, 1);
 		
-		renderInv(gameBorderWidth + viewWidth + 1, gameBorderWidth);
+		drawInv(gameBorderWidth + viewWidth + 1, gameBorderWidth);
 		
 		
 		//Draw to main canvas
@@ -269,7 +269,7 @@
 		//Fuel ore -> fuel
 		if (type == cellTypes.FUEL_ORE) {
 			++currentFuel;
-			//return //Balancing decision
+			return; //Balancing decision
 		}
 		
 		//Find some space
@@ -280,7 +280,7 @@
 		currentInv[spot] = maxInv;
 	}
 	
-	function renderInv(startX, startY) {
+	function drawInv(startX, startY) {
 		
 		let j = 0;
 		
@@ -311,7 +311,7 @@
 		}
 	}
 	
-	function renderGameMap(startX, startY, width, height, terrainX0, terrainY0) {
+	function drawGameMap(startX, startY, width, height, terrainX0, terrainY0) {
 		for(let x = 0; x < width; ++x) {
 			for(let y = 0; y < height; ++y) {
 				ctxGrid.fillStyle = colours[terr[cellToIndex(terrainX0 + x, terrainY0 + y)]];
