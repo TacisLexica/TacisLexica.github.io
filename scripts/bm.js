@@ -66,12 +66,14 @@
 		FUEL_FULL:		8,
 		DIRT:			9,
 		ROCK:			10,
-		FUEL_ORE:		11
+		FUEL_ORE:		11,
+		FRESH_AIR:		12
 	}
 	
 	let colours = [];
 	colours[cellTypes.VOID]			= "#000000";
 	colours[cellTypes.AIR]			= "#905320";
+	colours[cellTypes.FRESH_AIR]	= "#90A0B0";
 	colours[cellTypes.PLAYER]		= "#7FFFFF";
 	colours[cellTypes.HEALTH_EMPTY]	= "#800000";
 	colours[cellTypes.HEALTH_FULL]	= "#FF0000";
@@ -83,9 +85,10 @@
 	colours[cellTypes.ROCK]			= "#707070";
 	colours[cellTypes.FUEL_ORE]		= "#00A000";
 	
-	terr.fill(cellTypes.DIRT, 0, mapWidth * mapHeight);
+	terr.fill(cellTypes.FRESH_AIR, 0, mapWidth);
+	terr.fill(cellTypes.DIRT, mapWidth, mapWidth * mapHeight);
 
-	setTerrainType(playerX, playerY, cellTypes.AIR);
+	//setTerrainType(playerX, playerY, cellTypes.AIR);
 	
 	scatterTerrainInBox(0,1,mapWidth,5, cellTypes.FUEL_ORE, 20);
 	
@@ -210,10 +213,7 @@
 		ctxGrid.fillStyle = colours[cellTypes.VOID];
 		ctxGrid.fillRect(0, 0, cvsGrid.width, cvsGrid.height);
 		
-		drawGameMap(gameBorderWidth, gameBorderWidth, viewWidth, viewHeight, playerX - Math.floor(viewWidth/2), playerY - Math.floor(viewHeight/2));
-		
-		ctxGrid.fillStyle = colours[cellTypes.PLAYER];
-		ctxGrid.fillRect(gameBorderWidth + Math.floor(viewWidth/2), gameBorderWidth + Math.floor(viewHeight/2), 1, 1);
+		drawGameMap(gameBorderWidth, gameBorderWidth, viewWidth, viewHeight, playerX - Math.floor(viewWidth/2), Math.max(playerY - Math.floor(viewHeight/2), 0));
 		
 		drawInv(gameBorderWidth + viewWidth + 1, gameBorderWidth);
 		
@@ -226,6 +226,10 @@
 	let lastMoveTime = new Date(0);
 	
 	function movePlayer(targetX, targetY) {
+		if (targetY < 0 || targetY >= mapHeight) {
+			return;
+		}
+		
 		let targetType = getTerrainType(targetX,targetY);
 		
 		if (targetType !== cellTypes.ROCK) {
@@ -234,6 +238,9 @@
 			let movesRequired = 1;
 			if (targetType !== cellTypes.AIR) {
 				++movesRequired; //Dig penalty
+			}
+			if (targetType == cellTypes.FRESH_AIR) {
+				movesRequired = 0;
 			}
 			
 			if (movesRemaining < movesRequired) {
@@ -253,11 +260,16 @@
 			
 			if (targetType !== cellTypes.DIRT) {
 				if (targetType !== cellTypes.AIR) {
-					addToInventory(targetType);
+					if (targetType !== cellTypes.FRESH_AIR) {
+						addToInventory(targetType);
+					}
 				}
 			}
 			//console.log(movesRemaining);
-			setTerrainType(targetX, targetY, cellTypes.AIR);
+			if (targetType !== cellTypes.FRESH_AIR) {
+				setTerrainType(targetX, targetY, cellTypes.AIR);
+			}
+			
 			playerX = targetX;
 			playerY = targetY;
 		}
@@ -277,7 +289,7 @@
 		if (spot >= maxInv) {
 			return;
 		}
-		currentInv[spot] = maxInv;
+		currentInv[spot] = type;
 	}
 	
 	function drawInv(startX, startY) {
@@ -314,10 +326,13 @@
 	function drawGameMap(startX, startY, width, height, terrainX0, terrainY0) {
 		for(let x = 0; x < width; ++x) {
 			for(let y = 0; y < height; ++y) {
-				ctxGrid.fillStyle = colours[terr[cellToIndex(terrainX0 + x, terrainY0 + y)]];
+				ctxGrid.fillStyle = colours[getTerrainType(terrainX0 + x, terrainY0 + y)];
 				ctxGrid.fillRect(startX + x, startY + y, 1, 1);
 			}
 		}
+		
+		ctxGrid.fillStyle = colours[cellTypes.PLAYER];
+		ctxGrid.fillRect(startX + playerX - terrainX0, startY + playerY - terrainY0, 1, 1);
 	}
 	
 	function showKeyMap() {
