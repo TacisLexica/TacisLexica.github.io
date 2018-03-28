@@ -256,7 +256,7 @@
 					addToInventory(targetType);
 				}
 			}
-			console.log(movesRemaining);
+			//console.log(movesRemaining);
 			setTerrainType(targetX, targetY, cellTypes.AIR);
 			playerX = targetX;
 			playerY = targetY;
