@@ -90,6 +90,7 @@
 	addCellType("FUEL_FULL",	"#00FF00");
 	addCellType("DIRT",			"#703300", "AIR"	,	2);
 	addCellType("ROCK",			"#707070", "AIR"	,	30,		"ROCK",			1);
+	addCellType("COAL",			"#303030", "AIR"	,	2,		"COAL",			1);
 	addCellType("FUEL_ORE",		"#00A000", "AIR"	,	2,		"FUEL_FULL",	1);
 	addCellType("FUEL_SHOP",	"#30A050", null		,	0,		"FUEL_FULL",	99999);
 	
@@ -100,6 +101,7 @@
 	
 	scatterTerrainInBox(0,skyHeight,mapWidth,skyHeight + 5, cellTypes.FUEL_ORE, 20);
 	scatterTerrainInBox(0,skyHeight + 5,mapWidth,skyHeight + 8, cellTypes.ROCK, 50);
+	scatterTerrainInBox(0,skyHeight + 5,mapWidth,skyHeight + 8, cellTypes.COAL, 30);
 	
 	window.addEventListener("keydown",keyDownHandler);
 	window.addEventListener("keyup",keyUpHandler);
@@ -233,6 +235,12 @@
 	}
 	
 	let lastMoveTime = new Date(0);
+	let invPulseDur = 20;
+	let invPulseLevel = 0;
+	
+	function rgba(r,g,b,a) {
+		return "rgba(" + r + "," + g + "," + b + "," + a + ")";
+	}
 	
 	function movePlayer(targetX, targetY) {
 		if (targetY < skyHeight - 1 || targetY >= mapHeight) {
@@ -294,7 +302,8 @@
 		
 		//Find some space
 		let spot = currentInv.findIndex((i) => {return i == cellTypes.VOID});
-		if (spot >= maxInv) {
+		if (spot >= maxInv || spot < 0) {
+			invPulseLevel = invPulseDur;
 			return;
 		}
 		currentInv[spot] = type;
@@ -328,6 +337,13 @@
 				++j;
 			}
 			ctxGrid.fillRect(startX + i % invWidth, startY + j,1,1);
+			
+			ctxGrid.fillStyle = rgba(255,0,0,invPulseLevel/invPulseDur);
+			ctxGrid.fillRect(startX + i % invWidth, startY + j,1,1);
+		}
+		
+		if (invPulseLevel > 0) {
+			--invPulseLevel;
 		}
 	}
 	
