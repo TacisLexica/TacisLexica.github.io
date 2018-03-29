@@ -17,7 +17,7 @@
 	
 	
 	let mapWidth = 42;
-	let mapHeight = 42;
+	let mapHeight = 99;
 	
 	let viewWidth = 15;
 	let viewHeight = 13;
@@ -44,53 +44,62 @@
 	cvsGrid.width = viewWidth + invWidth + 1 + 2*gameBorderWidth;
 	cvsGrid.height = viewHeight + 2*gameBorderWidth;
 	
-	let scale = 4;
+	let scale = 16;
 	
 	cvs.width = cvsGrid.width * scale;
 	cvs.height = cvsGrid.height * scale;
 	
+	let skyHeight = 15;
+	
 	let playerX = 0;
-	let playerY = 0;
+	let playerY = skyHeight - 1;
 	
 	let terr = new Uint8ClampedArray(mapWidth * mapHeight);
 	
 	let cellTypes = {
-		VOID:			0,
-		AIR:			1,
-		PLAYER:			2,
-		HEALTH_EMPTY:	3,
-		HEALTH_FULL:	4,
-		INV_EMPTY:		5,
-		INV_FULL:		6,
-		FUEL_EMPTY:		7,
-		FUEL_FULL:		8,
-		DIRT:			9,
-		ROCK:			10,
-		FUEL_ORE:		11,
-		FRESH_AIR:		12
+		VOID:			0
 	}
 	
-	let colours = [];
-	colours[cellTypes.VOID]			= "#000000";
-	colours[cellTypes.AIR]			= "#905320";
-	colours[cellTypes.FRESH_AIR]	= "#90A0B0";
-	colours[cellTypes.PLAYER]		= "#7FFFFF";
-	colours[cellTypes.HEALTH_EMPTY]	= "#800000";
-	colours[cellTypes.HEALTH_FULL]	= "#FF0000";
-	colours[cellTypes.INV_EMPTY]	= "#202020";//Will be repurposed
-	colours[cellTypes.INV_FULL]		= "#FFFFFF";//Will be repurposed
-	colours[cellTypes.FUEL_EMPTY]	= "#008000";
-	colours[cellTypes.FUEL_FULL]	= "#00FF00";
-	colours[cellTypes.DIRT]			= "#703300";
-	colours[cellTypes.ROCK]			= "#707070";
-	colours[cellTypes.FUEL_ORE]		= "#00A000";
 	
-	terr.fill(cellTypes.FRESH_AIR, 0, mapWidth);
-	terr.fill(cellTypes.DIRT, mapWidth, mapWidth * mapHeight);
-
-	//setTerrainType(playerX, playerY, cellTypes.AIR);
+	let cellProperties = [{colour: "#000000", replace: 0}];
 	
-	scatterTerrainInBox(0,1,mapWidth,5, cellTypes.FUEL_ORE, 20);
+	let addCellType = (function() {
+		let ID = 0;
+		return function (name, colour, replace, density, loot, amt) {
+			if (typeof density === "undefined") { 
+				density = 2;
+			}
+			loot = loot || null;
+			replace = replace || null;
+			amt = amt || (loot ? 1 : 0);
+			cellTypes[name] = ++ID;
+			cellProperties[ID] = {colour: colour, replace: replace, density: density, loot: loot, amt: amt};
+			//colours[ID] = colour; //Temp
+		}
+	})();
+	
+	//			Name			Colour	   Replace		Density	Loot
+	addCellType("AIR",			"#905320", null,		1);
+	addCellType("FRESH_AIR",	"#90A0B0", null,		0);
+	addCellType("PLAYER",		"#7FFFFF", null,		99999);
+	addCellType("HEALTH_EMPTY",	"#800000");
+	addCellType("HEALTH_FULL",	"#FF0000");
+	addCellType("INV_EMPTY",	"#202020");//Will be repurposed
+	addCellType("INV_FULL",		"#FFFFFF");//Will be repurposed
+	addCellType("FUEL_EMPTY",	"#008000");
+	addCellType("FUEL_FULL",	"#00FF00");
+	addCellType("DIRT",			"#703300", "AIR"	,	2);
+	addCellType("ROCK",			"#707070", "AIR"	,	30,		"ROCK",			1);
+	addCellType("FUEL_ORE",		"#00A000", "AIR"	,	2,		"FUEL_FULL",	1);
+	addCellType("FUEL_SHOP",	"#30A050", null		,	0,		"FUEL_FULL",	99999);
+	
+	terr.fill(cellTypes.FRESH_AIR, 0, mapWidth * skyHeight);
+	terr.fill(cellTypes.DIRT, mapWidth * skyHeight, mapWidth * mapHeight);
+	
+	setTerrainType(4, skyHeight - 1, cellTypes.FUEL_SHOP);
+	
+	scatterTerrainInBox(0,skyHeight,mapWidth,skyHeight + 5, cellTypes.FUEL_ORE, 20);
+	scatterTerrainInBox(0,skyHeight + 5,mapWidth,skyHeight + 8, cellTypes.ROCK, 50);
 	
 	window.addEventListener("keydown",keyDownHandler);
 	window.addEventListener("keyup",keyUpHandler);
@@ -210,7 +219,7 @@
 			}
 		}
 		
-		ctxGrid.fillStyle = colours[cellTypes.VOID];
+		ctxGrid.fillStyle = cellProperties[cellTypes.VOID].colour;
 		ctxGrid.fillRect(0, 0, cvsGrid.width, cvsGrid.height);
 		
 		drawGameMap(gameBorderWidth, gameBorderWidth, viewWidth, viewHeight, playerX - Math.floor(viewWidth/2), Math.max(playerY - Math.floor(viewHeight/2), 0));
@@ -226,62 +235,61 @@
 	let lastMoveTime = new Date(0);
 	
 	function movePlayer(targetX, targetY) {
-		if (targetY < 0 || targetY >= mapHeight) {
+		if (targetY < skyHeight - 1 || targetY >= mapHeight) {
 			return;
 		}
 		
 		let targetType = getTerrainType(targetX,targetY);
 		
-		if (targetType !== cellTypes.ROCK) {
-			lastMoveTime = new Date();
-			
-			let movesRequired = 1;
-			if (targetType !== cellTypes.AIR) {
-				++movesRequired; //Dig penalty
+		let movesRequired = cellProperties[targetType].density;
+		lastMoveTime = new Date();
+		
+		//console.log("Move: ", targetType, movesRequired);
+		
+		if (movesRemaining < movesRequired && movesRemaining + movesPerFuel * currentFuel >= movesRequired) {
+			let fuelBurn = Math.ceil((movesRequired - movesRemaining)/movesPerFuel);
+			if (currentFuel >= fuelBurn) {
+				currentFuel -= fuelBurn;
+				movesRemaining += movesPerFuel * fuelBurn;
 			}
-			if (targetType == cellTypes.FRESH_AIR) {
-				movesRequired = 0;
-			}
-			
-			if (movesRemaining < movesRequired) {
-				if (currentFuel) {
-					--currentFuel;
-					movesRemaining += movesPerFuel;
-				}
-				else {
-					if (movesRemaining == 0) {
-						console.log("Lose - no fuel, no moves.");
-					}
-					return;
-				}
-			}
-			
-			movesRemaining -= movesRequired;
-			
-			if (targetType !== cellTypes.DIRT) {
-				if (targetType !== cellTypes.AIR) {
-					if (targetType !== cellTypes.FRESH_AIR) {
-						addToInventory(targetType);
-					}
-				}
-			}
-			//console.log(movesRemaining);
-			if (targetType !== cellTypes.FRESH_AIR) {
-				setTerrainType(targetX, targetY, cellTypes.AIR);
-			}
-			
-			playerX = targetX;
-			playerY = targetY;
 		}
+		
+		if (movesRemaining < movesRequired) {
+			if (movesRemaining <= 0 && currentFuel <= 0) {
+				console.log("Lose - no fuel, no moves.");
+			}
+			return;
+		}
+		else {
+			movesRemaining -= movesRequired;
+		}
+		
+		if (cellProperties[targetType].loot !== null) {
+			addToInventory(targetType);
+		}
+		
+		//console.log(movesRemaining);
+		if (cellProperties[targetType].replace !== null) {
+			setTerrainType(targetX, targetY, cellTypes[cellProperties[targetType].replace]);
+		}
+		
+		playerX = targetX;
+		playerY = targetY;
 	}
 	
 	function addToInventory(type, qty) {
-		qty = qty || 1;
+		//console.log("Loot: ", qty, type);
+		qty = (qty || cellProperties[type].amt) || 1;
 		
-		//Fuel ore -> fuel
-		if (type == cellTypes.FUEL_ORE) {
-			++currentFuel;
-			return; //Balancing decision
+		if (cellProperties[type].loot == null) {
+			return;
+		}
+		
+		//Fuel
+		if (cellTypes[cellProperties[type].loot] == cellTypes.FUEL_FULL) {
+			//console.log("Refuel: ", qty); 
+			currentFuel = Math.min(currentFuel + qty, maxFuel);
+			return;
 		}
 		
 		//Find some space
@@ -297,7 +305,7 @@
 		let j = 0;
 		
 		for (let i = 0; i < maxHealth; ++i) {
-			ctxGrid.fillStyle = colours[currentHealth > i ? cellTypes.HEALTH_FULL : cellTypes.HEALTH_EMPTY];
+			ctxGrid.fillStyle = cellProperties[currentHealth > i ? cellTypes.HEALTH_FULL : cellTypes.HEALTH_EMPTY].colour;
 			j = Math.floor(i / invWidth);
 			ctxGrid.fillRect(startX + i % invWidth, startY + j,1,1);
 		}
@@ -305,7 +313,7 @@
 		++j;
 		
 		for (let i = 0; i < maxFuel; ++i) {
-			ctxGrid.fillStyle = colours[currentFuel > i ? cellTypes.FUEL_FULL : cellTypes.FUEL_EMPTY];
+			ctxGrid.fillStyle = cellProperties[currentFuel > i ? cellTypes.FUEL_FULL : cellTypes.FUEL_EMPTY].colour;
 			if (i % invWidth == 0) {
 				++j;
 			}
@@ -315,7 +323,7 @@
 		++j;
 		
 		for (let i = 0; i < maxInv; ++i) {
-			ctxGrid.fillStyle = colours[currentInv[i] || cellTypes.INV_EMPTY];
+			ctxGrid.fillStyle = cellProperties[currentInv[i] || cellTypes.INV_EMPTY].colour;
 			if (i % invWidth == 0) {
 				++j;
 			}
@@ -326,12 +334,12 @@
 	function drawGameMap(startX, startY, width, height, terrainX0, terrainY0) {
 		for(let x = 0; x < width; ++x) {
 			for(let y = 0; y < height; ++y) {
-				ctxGrid.fillStyle = colours[getTerrainType(terrainX0 + x, terrainY0 + y)];
+				ctxGrid.fillStyle = cellProperties[getTerrainType(terrainX0 + x, terrainY0 + y)].colour;
 				ctxGrid.fillRect(startX + x, startY + y, 1, 1);
 			}
 		}
 		
-		ctxGrid.fillStyle = colours[cellTypes.PLAYER];
+		ctxGrid.fillStyle = cellProperties[cellTypes.PLAYER].colour;
 		ctxGrid.fillRect(startX + playerX - terrainX0, startY + playerY - terrainY0, 1, 1);
 	}
 	
